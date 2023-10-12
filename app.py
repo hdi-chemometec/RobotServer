@@ -118,4 +118,4 @@ def lights(light_bool):
         return return_string
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='localhost', port=5000)
