@@ -1,121 +1,255 @@
 from flask import Flask
+from requests import ConnectionError
 import requests
 import json
 
 app = Flask(__name__)
 
-robotURL = "http://169.254.85.139:31950"
+urlStart = 'http://'
+robotPORT = ":31950"
 contentType = 'application/json'
-ErrorMessage = "Something went wrong! Status code: "
+ErrorMessage = "An Error occurred! "
+nodeUrl = 'http://localhost:80/connect'
+
+IP_ADDRESS = ""
+
+#List and functions for protocols:
+protocol_list = []
+protocol_ids = []
+
+def get_protocol_list():
+    return protocol_list
+
+def set_protocol_list(list):
+    global protocol_list
+    protocol_list = set_protocol_ids(list)
+    return protocol_list
+
+def set_protocol_ids(json_list):
+    global protocol_ids
+    protocol_ids = []
+    #add all ids of protocols to a list
+    for i in range(len(json_list["data"])):
+        protocol_ids.append(json_list["data"][i]["id"])
+        protocol_ids.append(json_list["data"][i]["files"][0]["name"])
+    return protocol_ids
+
+def get_protocol_ids():
+    return protocol_ids
+
+
+#list of runs and it's functions:
+runs_list = []
+current_run = ""
+
+def get_runs_list():
+    return runs_list
+
+def set_runs_list(temp_runs):
+    global runs_list
+    runs_list = temp_runs
+    global current_run
+
+    current_run = temp_runs["links"]["current"]["href"]
+    current_run = current_run.split("/runs/")
+    current_run = current_run[1]
+
+def get_current_run():
+    return current_run
+
+def set_current_run(temp_value):
+    global current_run
+    current_run = temp_value
+
+
+# function to check if the connection to the robot is working and Node server is running
+def connection_check():
+    endpoint = nodeUrl
+    try:
+        response = requests.get(endpoint)
+        if(response.status_code >= 200 and response.status_code < 300):
+            result = json.loads(response.text)
+            global IP_ADDRESS
+            IP_ADDRESS = result["data"]
+            if(IP_ADDRESS != ""):
+                return True
+            else:
+                return False
+        else:
+            return False
+    except ConnectionError as e:
+        return_string = "Could not connect to Node server" + str(e)
+        return return_string
 
 @app.route('/')
 def home():
-    return "Hello World!"
+    connected = connection_check()
+    get_protocols()
+    get_runs()
+    get_current_run()
+    return "Hello from Flask server!" + " Node server is current connected? " +str(connected)
+    
 
 # url to use to get list of protocols known to the robot
 @app.route('/protocols')
 def get_protocols():
-    url = robotURL + "/protocols"
-    headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
-    response = requests.request("GET", url, headers=headers)
-    protocols = json.loads(response.text)
-    if(response.status_code >= 200 and response.status_code < 300):
-        return protocols
+    if (connection_check() == True):
+        url = urlStart + IP_ADDRESS + robotPORT + "/protocols"
+        headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
+        response = requests.request("GET", url, headers=headers)
+        protocols = json.loads(response.text)
+        if(response.status_code >= 200 and response.status_code < 300 and protocols != None):
+            set_protocol_list(protocols)
+            return protocols
+        else:
+            return_string = ErrorMessage + str(response.status_code)
+            return return_string
     else:
-        return_string = ErrorMessage + str(response.status_code)
-        return return_string
+            return_string = ErrorMessage
+            return return_string
+
+#gets json with all runs. the last one should be current if current=true
+@app.route('/runs')
+def get_runs():
+    if(connection_check() == True):
+        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        response = requests.request("GET", url, headers=headers)
+        runs = json.loads(response.text)
+        if(response.status_code >= 200 and response.status_code < 300):
+                set_runs_list(runs)
+                return runs
+        else:
+            return_string = ErrorMessage + str(response.status_code)
+            return return_string
+    else:
+            return_string = ErrorMessage
+            return return_string
+
+     
 
 # url to use when adding a protocol to list? of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol
 @app.route('/run/<protocol_id>')
 def run(protocol_id):
-    url = robotURL + "/runs"
-    headers = {"opentrons-version": "2", "Content-Type": contentType}
-    payload = {
-        "data": {
-            "protocolId": "",
-            "labwareOffsets": [
-                {
-                    "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
-                    "location": {
-                        "slotName": "1"
-                },
-                "vector": {
-                    "x": 0.29999999999999893,
-                    "y": 0.9000000000000057,
-                    "z": 0.0
+    if (connection_check() == True):
+        get_protocols()
+        protocol_list = get_protocol_list()
+        if(protocol_id not in protocol_list):
+            return ErrorMessage + "Protocol not found"
+        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        payload = {
+            "data": {
+                "protocolId": "",
+                "labwareOffsets": [
+                    {
+                        "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
+                        "location": {
+                            "slotName": "1"
+                    },
+                    "vector": {
+                        "x": 0.29999999999999893,
+                        "y": 0.9000000000000057,
+                        "z": 0.0
+                        }
                     }
-                }
-            ]
+                ]
+            }
         }
-    }
-    payload["data"]["protocolId"] = protocol_id
-    payload = json.dumps(payload)
+        payload["data"]["protocolId"] = protocol_id
+        payload = json.dumps(payload)
 
-    response = requests.request("POST", url, headers=headers, data=payload)
-    if(response.status_code >= 200 and response.status_code < 300):
-        protocol_id = response.json()["data"]["id"]
-        return_string = "Your run has the id: " + protocol_id
-        return return_string
+        response = requests.request("POST", url, headers=headers, data=payload)
+        if(response.status_code >= 200 and response.status_code < 300):
+            return_string = response.json()["data"]["id"]
+            set_current_run(return_string)
+            return return_string
+        else:
+            return_string = ErrorMessage + str(response.status_code)
+            return return_string
     else:
-        return_string = ErrorMessage + str(response.status_code)
-        return return_string
+            return_string = ErrorMessage
+            return return_string
+    
+
+@app.route('/runStatus/')
+def run_status():
+     if (connection_check() == True):
+        url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run()
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        response = requests.request("GET", url, headers=headers)
+        if(response.status_code >= 200 and response.status_code < 300):
+            status = response.json()["data"]["status"]
+            return status
+        else:
+            return_string = ErrorMessage + str(response.status_code)
+            return return_string
+
 
 # url to use to execute a protocol
-@app.route('/run/<protocol_id>/actions')
-def run_action(protocol_id):
-    url = robotURL + "/runs/" + protocol_id + "/actions"
-    headers = {"opentrons-version": "2", "Content-Type": contentType}
-    payload = {
-                "data": {
-                    "actionType": "play" 
+@app.route('/execute/')
+def run_action():
+    if (connection_check() == True):
+        if(run_status() == "succeeded" or run_status() == "stopped"):
+            return_string = "Protocol already executed"
+            return return_string
+        url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run() + "/actions"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        payload = {
+                    "data": {
+                        "actionType": "play" 
+                    }
                 }
-            }
-    payload = json.dumps(payload)
-    request = requests.request("POST", url, headers=headers, data=payload)
-    if(request.status_code >= 200 and request.status_code < 300):
-        return_string = "To resume a paused protocol, use the following url: http://localhost:5000/resume/" + protocol_id
-        return return_string
+        payload = json.dumps(payload)
+        request = requests.request("POST", url, headers=headers, data=payload)
+        if(request.status_code >= 200 and request.status_code < 300):
+            return_string = "To resume a paused protocol, use the following url: http://localhost:5000/resume/" + get_current_run()
+            return return_string
+        else:
+            return_string = ErrorMessage + str(request.status_code)
+            return return_string
     else:
-        return_string = ErrorMessage + str(request.status_code)
-        return return_string
-
-# url to use to resume a protocol that is paused
-@app.route('/resume/<run_id>')
-def resume(run_id):
-    run_action(run_id)
-    return_string = "The protocol has been resumed. If the run is paused again, use the following url: http://localhost:5000/resume/" + run_id + " to resume"
-    return return_string
+            return_string = ErrorMessage
+            return return_string
 
 @app.route('/lights')
 def lights_status():
-    url = robotURL + "/robot/lights"
-    headers = {"opentrons-version": "2", "Content-Type": contentType}
-    response = requests.request("GET", url, headers=headers)
-    if(response.status_code >= 200 and response.status_code < 300):
-        return json.loads(response.text)
+    if (connection_check() == True):
+        url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        response = requests.request("GET", url, headers=headers)
+        if(response.status_code >= 200 and response.status_code < 300):
+            return json.loads(response.text)
+        else:
+            return_string = ErrorMessage + str(response.status_code)
+            return return_string
     else:
-        return_string = ErrorMessage + str(response.status_code)
-        return return_string
+            return_string = ErrorMessage
+            return return_string
 
 @app.route('/lights/<light_bool>')
 def lights(light_bool):
-    url = robotURL + "/robot/lights"
-    headers = {"opentrons-version": "2", "Content-Type": contentType}
-    payload = {
-                "on": ""
-            }
-    payload["on"] = light_bool
-    payload = json.dumps(payload)
-    request = requests.request("POST", url, headers=headers, data=payload)
-    if(request.status_code >= 200 and request.status_code < 300):
-        if(light_bool == "true"):
-            return_string = "Lights are now on"
+    if(connection_check() == True):
+        url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        payload = {
+                    "on": ""
+                }
+        payload["on"] = light_bool
+        payload = json.dumps(payload)
+        request = requests.request("POST", url, headers=headers, data=payload)
+        if(request.status_code >= 200 and request.status_code < 300):
+            if(light_bool == "true"):
+                return_string = "Lights are now on"
+            else:
+                return_string = "Lights are now off"
+            return return_string
         else:
-            return_string = "Lights are now off"
-        return return_string
+            return_string = ErrorMessage + str(request.status_code)
+            return return_string
     else:
-        return_string = ErrorMessage + str(request.status_code)
-        return return_string
+            return_string = ErrorMessage
+            return return_string
 
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=5000)
