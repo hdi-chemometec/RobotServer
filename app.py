@@ -80,6 +80,8 @@ def connection_check():
     except ConnectionError as e:
         return_string = "Could not connect to Node server" + str(e)
         return return_string
+    
+@app.before_first_request(connection_check())
 
 @app.route('/')
 def home():
