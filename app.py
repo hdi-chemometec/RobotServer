@@ -100,7 +100,7 @@ def home():
     
 
 # url to use to get list of protocols known to the robot
-@app.route('/protocols')
+@app.route('/protocols', methods=['GET'])
 def get_protocols():
     if (connection_check() == True):
         url = urlStart + IP_ADDRESS + robotPORT + "/protocols"
@@ -116,7 +116,7 @@ def get_protocols():
         return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
 
 #gets json with all runs. the last one should be current if current=true
-@app.route('/runs')
+@app.route('/runs', methods=['GET'])
 def get_runs():
     if(connection_check() == True):
         url = urlStart + IP_ADDRESS + robotPORT + "/runs"
@@ -136,7 +136,7 @@ def get_runs():
 #It returns an id for the run
 # url to use when adding a protocol to list of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol, e.g. pick_up.py
 # test 4cc224a7-f47c-40db-8eef-9f791c689fab
-@app.route('/runs/<protocol_id>')
+@app.route('/runs/<protocol_id>', methods=['POST'])
 def run(protocol_id):
     if (connection_check() == True):
         get_protocols()
@@ -177,7 +177,7 @@ def run(protocol_id):
         return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
     
 
-@app.route('/runStatus/')
+@app.route('/runStatus/', methods=['GET'])
 def run_status():
      if (connection_check() == True):
         url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run()
@@ -191,7 +191,7 @@ def run_status():
 
 
 # url to use to execute a protocol
-@app.route('/execute/')
+@app.route('/execute/', methods=['POST'])
 def run_action():
     if (connection_check() == True):
         if(run_status() == "succeeded" or run_status() == "stopped"):
@@ -206,11 +206,11 @@ def run_action():
         payload = json.dumps(payload)
         request = requests.request("POST", url, headers=headers, data=payload)
         if(request.status_code >= 200 and request.status_code < 300):
-            return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=200, mimetype=contentType)
+            return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=201, mimetype=contentType)
         else:
             return Response(json.dumps({'error': '{error}'.format(error=request)}), status=request.status_code, mimetype=contentType)
 
-@app.route('/lights')
+@app.route('/lights', methods=['GET'])
 def lights_status():
     if (connection_check() == True):
         url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
@@ -224,7 +224,7 @@ def lights_status():
     else:
         return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
 
-@app.route('/lights/<light_bool>')
+@app.route('/lights/<light_bool>', methods=['POST'])
 def lights(light_bool):
     if(connection_check() == True):
         url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
