@@ -2,6 +2,7 @@ from flask import Flask
 from requests import ConnectionError
 import requests
 import json
+import re
 
 app = Flask(__name__)
 
@@ -21,6 +22,8 @@ def get_protocol_list():
     return protocol_list
 
 def set_protocol_list(list):
+    if(len(list) == 0):
+        return ErrorMessage + "No protocols found"
     global protocol_list
     protocol_list = set_protocol_ids(list)
     return protocol_list
@@ -29,10 +32,13 @@ def set_protocol_ids(json_list):
     global protocol_ids
     protocol_ids = []
     #add all ids of protocols to a list
-    for i in range(len(json_list["data"])):
-        protocol_ids.append(json_list["data"][i]["id"])
-        protocol_ids.append(json_list["data"][i]["files"][0]["name"])
-    return protocol_ids
+    try:
+        for i in range(len(json_list["data"])):
+            protocol_ids.append(json_list["data"][i]["id"])
+            protocol_ids.append(json_list["data"][i]["files"][0]["name"])
+        return protocol_ids
+    except KeyError:
+        return ErrorMessage + "No protocols found"
 
 def get_protocol_ids():
     return protocol_ids
@@ -49,39 +55,41 @@ def set_runs_list(temp_runs):
     global runs_list
     runs_list = temp_runs
     global current_run
-
-    current_run = temp_runs["links"]["current"]["href"]
-    current_run = current_run.split("/runs/")
-    current_run = current_run[1]
+    try:
+        current_run = temp_runs["links"]["current"]["href"]
+        current_run = current_run.split("/runs/")
+        current_run = current_run[1]
+    except KeyError: #this happens if there is no current run
+        current_run = ""
 
 def get_current_run():
     return current_run
 
 def set_current_run(temp_value):
+    if(temp_value == ""):
+        return ErrorMessage + "No run found"
     global current_run
     current_run = temp_value
 
 
 # function to check if the connection to the robot is working and Node server is running
 def connection_check():
-    endpoint = nodeUrl
     try:
-        response = requests.get(endpoint)
+        response = requests.get(nodeUrl)
         if(response.status_code >= 200 and response.status_code < 300):
             result = json.loads(response.text)
             global IP_ADDRESS
             IP_ADDRESS = result["data"]
-            if(IP_ADDRESS != ""):
-                return True
-            else:
+            match = re.search(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$', result["data"]) #regular expression for IP address
+            if(match == None):
                 return False
+            else:
+                return True
         else:
             return False
     except ConnectionError as e:
         return_string = "Could not connect to Node server" + str(e)
         return return_string
-    
-@app.before_first_request(connection_check())
 
 @app.route('/')
 def home():
@@ -129,15 +137,17 @@ def get_runs():
             return return_string
 
      
-
-# url to use when adding a protocol to list? of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol
-@app.route('/run/<protocol_id>')
+#Create a new run with a protocol id
+#It returns an id for the run
+# url to use when adding a protocol to list of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol, e.g. pick_up.py
+# test 4cc224a7-f47c-40db-8eef-9f791c689fab
+@app.route('/runs/<protocol_id>')
 def run(protocol_id):
     if (connection_check() == True):
         get_protocols()
         protocol_list = get_protocol_list()
         if(protocol_id not in protocol_list):
-            return ErrorMessage + "Protocol not found"
+            return ErrorMessage + "404 - Protocol not found"
         url = urlStart + IP_ADDRESS + robotPORT + "/runs"
         headers = {"opentrons-version": "2", "Content-Type": contentType}
         payload = {
@@ -205,7 +215,7 @@ def run_action():
         payload = json.dumps(payload)
         request = requests.request("POST", url, headers=headers, data=payload)
         if(request.status_code >= 200 and request.status_code < 300):
-            return_string = "To resume a paused protocol, use the following url: http://localhost:5000/resume/" + get_current_run()
+            return_string = "To resume a paused protocol, use the following url: http://localhost:5000/execute/"
             return return_string
         else:
             return_string = ErrorMessage + str(request.status_code)
