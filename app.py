@@ -1,4 +1,4 @@
-from flask import Flask, Response
+from flask import Flask, Response, request, jsonify
 from requests import ConnectionError
 import requests
 import json
@@ -210,6 +210,7 @@ def run_action():
         else:
             return Response(json.dumps({'error': '{error}'.format(error=request)}), status=request.status_code, mimetype=contentType)
 
+
 @app.get('/lights')
 def lights_status():
     if (connection_check() == True):
@@ -224,9 +225,16 @@ def lights_status():
     else:
         return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
 
-@app.post('/lights/<light_bool>')
-def lights(light_bool):
-    if(connection_check() == True):
+
+@app.route('/lights', methods=['POST'])
+def post_light():
+    if (connection_check() == True):
+        try:
+            obj = request.get_data()
+            obj = json.loads(obj)
+            light_bool = obj['light']
+        except KeyError:
+            return Response(json.dumps({'error': 'No key found'}), status=404, mimetype=contentType)
         url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
         headers = {"opentrons-version": "2", "Content-Type": contentType}
         payload = {
@@ -234,9 +242,9 @@ def lights(light_bool):
                 }
         payload["on"] = light_bool
         payload = json.dumps(payload)
-        request = requests.request("POST", url, headers=headers, data=payload)
-        if(request.status_code >= 200 and request.status_code < 300):
-            if(light_bool == "true"):
+        robot_request = requests.request("POST", url, headers=headers, data=payload)
+        if(robot_request.status_code >= 200 and robot_request.status_code < 300):
+            if(light_bool == True):
                 return_string = "Lights are now on"
             else:
                 return_string = "Lights are now off"
