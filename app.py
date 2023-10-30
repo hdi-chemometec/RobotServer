@@ -1,4 +1,4 @@
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request
 from requests import ConnectionError
 import requests
 import json
@@ -37,7 +37,7 @@ def set_protocol_ids(json_list):
             protocol_ids.append(json_list["data"][i]["files"][0]["name"])
         return protocol_ids
     except KeyError as e:
-        return Response(json.dumps({'Error': '{error}'.format(error=e)}), status=404, mimetype=contentType)
+        return Response(json.dumps({'Error': '{e}'.format(e=e)}), status=404, mimetype=contentType)
 
 def get_protocol_ids():
     return protocol_ids
@@ -74,9 +74,9 @@ def set_current_run(temp_value):
 # function to check if the connection to the robot is working and Node server is running
 def connection_check():
     try:
-        request = requests.get(nodeUrl)
-        if(request.status_code >= 200 and request.status_code < 300):
-            result = json.loads(request.text)
+        robot_request = requests.get(nodeUrl)
+        if(robot_request.status_code == 200):
+            result = json.loads(robot_request.text)
             global IP_ADDRESS
             IP_ADDRESS = result["data"]
             match = re.search(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$', result["data"]) #regular expression for IP address
@@ -89,6 +89,11 @@ def connection_check():
     except ConnectionError as e:
         print(e)
         return False
+    
+@app.before_request
+def before_request():
+    if (connection_check() == False):
+        return Response(json.dumps({'error': 'Service unavailable'}), status=504, mimetype=contentType)
 
 @app.route('/')
 def home():
@@ -96,161 +101,150 @@ def home():
     get_protocols()
     get_runs()
     get_current_run()
-    return "Hello from Flask server!" + " Node server is current connected? " +str(connected)
-    
+    return "Hello from Flask server!" + " Node server is currently connected? " +str(connected)
+
+@app.get('/lights')
+def get_lights():
+    url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    robot_request = requests.request("GET", url, headers=headers)
+    if(robot_request.status_code == 200):
+        return json.loads(robot_request.text)
+    else:
+        return Response(json.dumps({'error': 'Something went wrong'}), status=robot_request.status_code, mimetype=contentType)
+
+@app.post('/lights')
+def post_light():
+    try:
+        obj = request.get_data()
+        obj = json.loads(obj)
+        light_bool = obj['light']
+    except KeyError:
+        return Response(json.dumps({'error': 'No key found'}), status=404, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    payload = {
+                "on": ""
+            }
+    payload["on"] = light_bool
+    payload = json.dumps(payload)
+    robot_request = requests.request("POST", url, headers=headers, data=payload)
+    if(robot_request.status_code == 200):
+        if(light_bool == True):
+            return_string = "Lights are now on"
+        else:
+            return_string = "Lights are now off"
+        return return_string
+    else:
+        return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
 
 # url to use to get list of protocols known to the robot
 @app.get('/protocols')
 def get_protocols():
-    if (connection_check() == True):
-        url = urlStart + IP_ADDRESS + robotPORT + "/protocols"
-        headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
-        request = requests.request("GET", url, headers=headers)
-        protocols = json.loads(request.text)
-        if(request.status_code == 200):
-            set_protocol_list(protocols)
-            return protocols
-        else:
-            return Response(json.dumps({'error': 'No protocols found'}), status=request.status_code, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/protocols"
+    headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
+    robot_request = requests.request("GET", url, headers=headers)
+    protocols = json.loads(robot_request.text)
+    if(robot_request.status_code == 200):
+        set_protocol_list(protocols)
+        return protocols
     else:
-        return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
+        return Response(json.dumps({'error': 'No protocols found'}), status=robot_request.status_code, mimetype=contentType)
 
 #gets json with all runs. the last one should be current if current=true
 @app.get('/runs')
 def get_runs():
-    if(connection_check() == True):
-        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        request = requests.request("GET", url, headers=headers)
-        runs = json.loads(request.text)
-        if(request.status_code == 200):
-                set_runs_list(runs)
-                return runs
-        else:
-            return Response(json.dumps({'error': 'No runs found'}), status=request.status_code, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    robot_request = requests.request("GET", url, headers=headers)
+    runs = json.loads(robot_request.text)
+    if(robot_request.status_code == 200):
+            set_runs_list(runs)
+            return runs
     else:
-        return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
-
+        return Response(json.dumps({'error': 'No runs found'}), status=robot_request.status_code, mimetype=contentType)
      
 #Create a new run with a protocol id
 #It returns an id for the run
 # url to use when adding a protocol to list of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol, e.g. pick_up.py
 # test 4cc224a7-f47c-40db-8eef-9f791c689fab
-@app.post('/runs/<protocol_id>')
-def post_run(protocol_id):
-    if (connection_check() == True):
-        get_protocols()
+@app.post('/runs')
+def post_run():
+    get_protocols()
+    try:
         protocol_list = get_protocol_list()
-        if(protocol_id not in protocol_list):
-            return Response(json.dumps({'error': 'Protocol not found'}), status=404, mimetype=contentType)
-        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        payload = {
-            "data": {
-                "protocolId": "",
-                "labwareOffsets": [
-                    {
-                        "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
-                        "location": {
-                            "slotName": "1"
-                    },
-                    "vector": {
-                        "x": 0.29999999999999893,
-                        "y": 0.9000000000000057,
-                        "z": 0.0
-                        }
+        obj = request.get_data()
+        obj = json.loads(obj)
+        protocol_id = obj['protocol_id']
+    except KeyError:
+        return Response(json.dumps({'error': 'No protocol with that id found'}), status=404, mimetype=contentType)
+    if(protocol_id not in protocol_list):
+        return Response(json.dumps({'error': 'Protocol not found'}), status=404, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    payload = {
+        "data": {
+            "protocolId": "",
+            "labwareOffsets": [
+                {
+                    "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
+                    "location": {
+                        "slotName": "1"
+                },
+                "vector": {
+                    "x": 0.29999999999999893,
+                    "y": 0.9000000000000057,
+                    "z": 0.0
                     }
-                ]
-            }
+                }
+            ]
         }
-        payload["data"]["protocolId"] = protocol_id
-        payload = json.dumps(payload)
+    }
+    payload["data"]["protocolId"] = protocol_id
+    payload = json.dumps(payload)
 
-        request = requests.request("POST", url, headers=headers, data=payload)
-        if(request.status_code == 201):
-            return_string = request.json()["data"]["id"]
-            set_current_run(return_string)
-            return Response(json.dumps({'message': 'Run created', 'runId': '{return_string}'.format(return_string=return_string)}), status=201, mimetype=contentType)
-        else:
-            return Response(json.dumps({'error': '{error}'.format(error=request)}), status=request.status_code, mimetype=contentType)
+    robot_request = requests.request("POST", url, headers=headers, data=payload)
+    if(robot_request.status_code == 201):
+        return_string = robot_request.json()["data"]["id"]
+        set_current_run(return_string)
+        return Response(json.dumps({'message': 'Run created', 'runId': '{return_string}'.format(return_string=return_string)}), status=201, mimetype=contentType)
     else:
-        return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
+        return Response(json.dumps({'error': 'Run was not created'}), status=robot_request.status_code, mimetype=contentType)
     
 
-@app.get('/runStatus/')
+@app.get('/runStatus')
 def run_status():
-     if (connection_check() == True):
-        url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run()
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        request = requests.request("GET", url, headers=headers)
-        if(request.status_code >= 200 and request.status_code < 300):
-            status = request.json()["data"]["status"]
-            return status
-        else:
-            return Response(json.dumps({'error': '{error}'.format(error=request)}), status=request.status_code, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run()
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    robot_request = requests.request("GET", url, headers=headers)
+    if(robot_request.status_code == 200):
+        try:
+            status = robot_request.json()["data"]["status"]
+        except KeyError:
+            return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
+        return status
+    else:
+        return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
 
 # url to use to execute a protocol
-@app.post('/execute/')
+@app.post('/execute')
 def run_action():
-    if (connection_check() == True):
-        if(run_status() == "succeeded" or run_status() == "stopped"):
-            return Response(json.dumps({'error': 'Run has already been executed'}), status=403, mimetype=contentType)
-        url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run() + "/actions"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        payload = {
-                    "data": {
-                        "actionType": "play" 
-                    }
+    if(run_status() == "succeeded" or run_status() == "stopped"):
+        return Response(json.dumps({'error': 'Run has already been executed'}), status=403, mimetype=contentType)
+    url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run() + "/actions"
+    headers = {"opentrons-version": "2", "Content-Type": contentType}
+    payload = {
+                "data": {
+                    "actionType": "play" 
                 }
-        payload = json.dumps(payload)
-        request = requests.request("POST", url, headers=headers, data=payload)
-        if(request.status_code >= 200 and request.status_code < 300):
-            return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=201, mimetype=contentType)
-        else:
-            return Response(json.dumps({'error': '{error}'.format(error=request)}), status=request.status_code, mimetype=contentType)
-
-
-@app.get('/lights')
-def lights_status():
-    if (connection_check() == True):
-        url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        request = requests.request("GET", url, headers=headers)
-        if(request.status_code >= 200 and request.status_code < 300):
-            return json.loads(request.text)
-        else:
-            return Response(json.dumps({'error': 'Something went wrong'}), status=request.status_code, mimetype=contentType)
-
+            }
+    payload = json.dumps(payload)
+    robot_request = requests.request("POST", url, headers=headers, data=payload)
+    if(robot_request.status_code == 201):
+        return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=201, mimetype=contentType)
     else:
-        return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
-
-
-@app.route('/lights', methods=['POST'])
-def post_light():
-    if (connection_check() == True):
-        try:
-            obj = request.get_data()
-            obj = json.loads(obj)
-            light_bool = obj['light']
-        except KeyError:
-            return Response(json.dumps({'error': 'No key found'}), status=404, mimetype=contentType)
-        url = urlStart + IP_ADDRESS + robotPORT + "/robot/lights"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        payload = {
-                    "on": ""
-                }
-        payload["on"] = light_bool
-        payload = json.dumps(payload)
-        robot_request = requests.request("POST", url, headers=headers, data=payload)
-        if(robot_request.status_code >= 200 and robot_request.status_code < 300):
-            if(light_bool == True):
-                return_string = "Lights are now on"
-            else:
-                return_string = "Lights are now off"
-            return return_string
-        else:
-            return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
+        return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=5000)
