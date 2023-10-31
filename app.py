@@ -101,7 +101,8 @@ def home():
     get_protocols()
     get_runs()
     get_current_run()
-    return "Hello from Flask server!" + " Node server is currently connected? " +str(connected)
+    return Response(json.dumps({'message': 'Hello from Flask server! Node server is currently connected?{connected}'.format(connected=connected)}), status=200, mimetype=contentType)
+
 
 @app.get('/lights')
 def get_lights():
