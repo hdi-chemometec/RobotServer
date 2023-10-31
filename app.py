@@ -89,7 +89,7 @@ def connection_check():
     except ConnectionError as e:
         print(e)
         return False
-    
+
 @app.before_request
 def before_request():
     if (connection_check() == False):
@@ -101,7 +101,7 @@ def home():
     get_protocols()
     get_runs()
     get_current_run()
-    return Response(json.dumps({'message': 'Hello from Flask server! Node server is currently connected?{connected}'.format(connected=connected)}), status=200, mimetype=contentType)
+    return Response(json.dumps({'message': 'Hello from Flask server!', 'connected': '{connected}'.format(connected=connected)}), status=200, mimetype=contentType)
 
 
 @app.get('/lights')
@@ -110,7 +110,7 @@ def get_lights():
     headers = {"opentrons-version": "2", "Content-Type": contentType}
     robot_request = requests.request("GET", url, headers=headers)
     if(robot_request.status_code == 200):
-        return json.loads(robot_request.text)
+        return Response(json.dumps({'light': json.loads(robot_request.text)}), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'Something went wrong'}), status=robot_request.status_code, mimetype=contentType)
 
@@ -131,11 +131,7 @@ def post_light():
     payload = json.dumps(payload)
     robot_request = requests.request("POST", url, headers=headers, data=payload)
     if(robot_request.status_code == 200):
-        if(light_bool == True):
-            return_string = "Lights are now on"
-        else:
-            return_string = "Lights are now off"
-        return return_string
+        return Response(json.dumps({'light': json.loads(robot_request.text)}), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'Internal Server Error'}), status=500, mimetype=contentType)
 
@@ -148,7 +144,7 @@ def get_protocols():
     protocols = json.loads(robot_request.text)
     if(robot_request.status_code == 200):
         set_protocol_list(protocols)
-        return protocols
+        return Response(json.dumps(protocols), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'No protocols found'}), status=robot_request.status_code, mimetype=contentType)
 
@@ -161,14 +157,10 @@ def get_runs():
     runs = json.loads(robot_request.text)
     if(robot_request.status_code == 200):
             set_runs_list(runs)
-            return runs
+            return Response(json.dumps(runs), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'No runs found'}), status=robot_request.status_code, mimetype=contentType)
-     
-#Create a new run with a protocol id
-#It returns an id for the run
-# url to use when adding a protocol to list of runs to execute OBS: protocolId is the id of the protocol and should be changed if wished for another protocol, e.g. pick_up.py
-# test 4cc224a7-f47c-40db-8eef-9f791c689fab
+
 @app.post('/runs')
 def post_run():
     get_protocols()
@@ -223,7 +215,7 @@ def run_status():
             status = robot_request.json()["data"]["status"]
         except KeyError:
             return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
-        return status
+        return Response(json.dumps({'message': status}), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
