@@ -215,12 +215,10 @@ def run_status():
             status = robot_request.json()["data"]["status"]
         except KeyError:
             return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
-        return Response(json.dumps({'message': status}), status=200, mimetype=contentType)
+        return Response(json.dumps({'run status': status}), status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
-
-# url to use to execute a protocol
 @app.post('/execute')
 def run_action():
     if(run_status() == "succeeded" or run_status() == "stopped"):
