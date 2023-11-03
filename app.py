@@ -86,7 +86,7 @@ def connection_check():
                 print("No IP address found")
                 return False
             else:
-                print("IP address found" + IP_ADDRESS)
+                print("IP address found " + IP_ADDRESS)
                 return True
         else:
             print("No IP address found")
