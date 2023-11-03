@@ -1,15 +1,17 @@
-from flask import Flask, Response, request
+from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
 from requests import ConnectionError
 import requests
 import json
 import re
 
 app = Flask(__name__)
+CORS(app)
 
 urlStart = 'http://'
 robotPORT = ":31950"
 contentType = 'application/json'
-nodeUrl = 'http://localhost:80/connect'
+nodeUrl = 'http://localhost:4000/connect'
 
 IP_ADDRESS = ""
 
@@ -81,28 +83,26 @@ def connection_check():
             IP_ADDRESS = result["data"]
             match = re.search(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$', result["data"]) #regular expression for IP address
             if(match == None):
+                print("No IP address found")
                 return False
             else:
+                print("IP address found" + IP_ADDRESS)
                 return True
         else:
+            print("No IP address found")
             return False
     except ConnectionError as e:
-        print(e)
+        print(e + "error in connection_check")
         return False
-
-@app.before_request
-def before_request():
-    if (connection_check() == False):
-        return Response(json.dumps({'error': 'Service unavailable'}), status=504, mimetype=contentType)
 
 @app.route('/')
 def home():
-    connected = connection_check()
-    get_protocols()
-    get_runs()
-    get_current_run()
-    return Response(json.dumps({'message': 'Hello from Flask server!', 'connected': '{connected}'.format(connected=connected)}), status=200, mimetype=contentType)
+    return Response('Flask server is connected!', status=200, mimetype=contentType)
 
+@app.route('/connect')
+def connect():
+    connected = connection_check()
+    return Response('{connected}'.format(connected=connected), status=200, mimetype=contentType)
 
 @app.get('/lights')
 def get_lights():
@@ -207,6 +207,8 @@ def post_run():
 
 @app.get('/runStatus')
 def run_status():
+    if(get_current_run() == ""):
+        return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run()
     headers = {"opentrons-version": "2", "Content-Type": contentType}
     robot_request = requests.request("GET", url, headers=headers)
@@ -215,7 +217,7 @@ def run_status():
             status = robot_request.json()["data"]["status"]
         except KeyError:
             return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
-        return Response(json.dumps({'run status': status}), status=200, mimetype=contentType)
+        return Response(status, status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
