@@ -3,6 +3,7 @@ from flask_cors import CORS
 from requests import ConnectionError
 import requests
 import json
+import re #regular expression
 
 app = Flask(__name__)
 CORS(app)
