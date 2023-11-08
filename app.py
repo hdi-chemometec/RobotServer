@@ -1,4 +1,4 @@
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request
 from flask_cors import CORS
 from requests import ConnectionError
 import requests
@@ -29,9 +29,12 @@ def set_protocol_list(list):
     protocol_list = set_protocol_ids(list)
     return protocol_list
 
+def get_protocol_ids():
+    return protocol_ids
+
 def set_protocol_ids(json_list):
     global protocol_ids
-    protocol_ids = []
+    protocol_ids = [] # this is to erase the old ids
     #add all ids of protocols to a list
     try:
         for i in range(len(json_list["data"])):
@@ -40,10 +43,6 @@ def set_protocol_ids(json_list):
         return protocol_ids
     except KeyError as e:
         return Response(json.dumps({'Error': '{e}'.format(e=e)}), status=404, mimetype=contentType)
-
-def get_protocol_ids():
-    return protocol_ids
-
 
 #list of runs and it's functions:
 runs_list = []
@@ -55,13 +54,12 @@ def get_runs_list():
 def set_runs_list(temp_runs):
     global runs_list
     runs_list = temp_runs
-    global current_run
     try:
-        current_run = temp_runs["links"]["current"]["href"]
-        current_run = current_run.split("/runs/")
-        current_run = current_run[1]
+        temp_current_run = temp_runs["links"]["current"]["href"]
+        temp_current_run = temp_current_run.split("/runs/")
+        set_current_run(temp_current_run[1])
     except KeyError: #this happens if there is no current run
-        current_run = ""
+        set_current_run("")
 
 def get_current_run():
     return current_run
@@ -94,6 +92,11 @@ def connection_check():
     except ConnectionError as e:
         print(e + "error in connection_check")
         return False
+    except e:
+        print(e + "error")
+        return False
+    
+### ROUTES ###
 
 @app.route('/')
 def home():
@@ -144,22 +147,29 @@ def get_protocols():
     protocols = json.loads(robot_request.text)
     if(robot_request.status_code == 200):
         set_protocol_list(protocols)
-        return Response(json.dumps(protocols), status=200, mimetype=contentType)
+        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+        headers = {"opentrons-version": "2", "Content-Type": contentType}
+        robot_request = requests.request("GET", url, headers=headers)
+        runs = json.loads(robot_request.text)
+        if(robot_request.status_code == 200):
+            set_runs_list(runs)
+            return Response(json.dumps(protocols), status=200, mimetype=contentType)
+        return Response(json.dumps({'error': 'No runs found'}), status=robot_request.status_code, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'No protocols found'}), status=robot_request.status_code, mimetype=contentType)
 
-#gets json with all runs. the last one should be current if current=true
-@app.get('/runs')
-def get_runs():
-    url = urlStart + IP_ADDRESS + robotPORT + "/runs"
-    headers = {"opentrons-version": "2", "Content-Type": contentType}
-    robot_request = requests.request("GET", url, headers=headers)
-    runs = json.loads(robot_request.text)
-    if(robot_request.status_code == 200):
-            set_runs_list(runs)
-            return Response(json.dumps(runs), status=200, mimetype=contentType)
-    else:
-        return Response(json.dumps({'error': 'No runs found'}), status=robot_request.status_code, mimetype=contentType)
+#THIS MIGHT NOT BE NEEDED
+#@app.get('/runs')
+#def get_runs():
+#    url = urlStart + IP_ADDRESS + robotPORT + "/runs"
+#    headers = {"opentrons-version": "2", "Content-Type": contentType}
+#    robot_request = requests.request("GET", url, headers=headers)
+#    runs = json.loads(robot_request.text)
+#    if(robot_request.status_code == 200):
+#            set_runs_list(runs)
+#            return Response(json.dumps(runs), status=200, mimetype=contentType)
+#    else:
+#        return Response(json.dumps({'error': 'No runs found'}), status=robot_request.status_code, mimetype=contentType)
 
 @app.post('/runs')
 def post_run():
@@ -203,7 +213,6 @@ def post_run():
         return Response(json.dumps({'message': 'Run created', 'runId': '{return_string}'.format(return_string=return_string)}), status=201, mimetype=contentType)
     else:
         return Response(json.dumps({'error': 'Run was not created'}), status=robot_request.status_code, mimetype=contentType)
-    
 
 @app.get('/runStatus')
 def run_status():
@@ -221,23 +230,45 @@ def run_status():
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
-@app.post('/execute')
+#this command is used to run/resume, pause or stop a run
+@app.post('/command')
 def run_action():
+    try:
+        obj = request.get_data()
+        obj = json.loads(obj)
+        command = obj['command']
+        print("command: " + command)
+    except KeyError:
+        return Response(json.dumps({'error': 'No command found'}), status=404, mimetype=contentType)
     if(run_status() == "succeeded" or run_status() == "stopped"):
         return Response(json.dumps({'error': 'Run has already been executed'}), status=403, mimetype=contentType)
+    if(command == "play"):
+        payload = {
+            "data": {
+                "actionType": "play" 
+            }
+        }
+    elif(command == 'pause'):
+        payload = {
+            "data": {
+                "actionType": "pause" 
+            }
+        }
+    else:
+        payload = {
+            "data": {
+                "actionType": "stop" 
+            }
+        }
+    payload = json.dumps(payload)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + get_current_run() + "/actions"
     headers = {"opentrons-version": "2", "Content-Type": contentType}
-    payload = {
-                "data": {
-                    "actionType": "play" 
-                }
-            }
-    payload = json.dumps(payload)
     robot_request = requests.request("POST", url, headers=headers, data=payload)
     if(robot_request.status_code == 201):
         return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=201, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robot_request)}), status=robot_request.status_code, mimetype=contentType)
 
+### Main ###
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=5000)
