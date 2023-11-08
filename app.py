@@ -11,7 +11,7 @@ CORS(app)
 urlStart = 'http://'
 robotPORT = ":31950"
 contentType = 'application/json'
-nodeUrl = 'http://localhost:4000/connect'
+nodeUrl = 'http://localhost:4000/connect' #Node Server url
 
 IP_ADDRESS = ""
 
