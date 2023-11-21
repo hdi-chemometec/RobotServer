@@ -39,6 +39,7 @@ def getProtocolIds():
 def setProtocolIds(jsonList):
     global protocolIds
     protocolIds = [] # this is to erase the old ids
+
     #add all ids of protocols to a list
     try:
         for i in range(len(jsonList["data"])):
@@ -75,8 +76,11 @@ def setCurrentRun(tempValue):
     currentRun = tempValue
 
 
-# function to check if the connection to the robot is working and Node server is running
 def connectionCheck():
+    """Function to check if the connection to the robot is working by fetching the IP address from the Node server.
+    
+    It is used by the connect route."""
+
     try:
         robotRequest = requests.get(nodeUrl)
         if(robotRequest.status_code == 200):
@@ -102,11 +106,13 @@ def home():
     """Start page for REST API.
     
     It is used by the Node server to check if Python server is running."""
+    
     return Response('Flask server is connected!', status=200, mimetype=contentType)
 
 @app.route('/connect')
 def connect():
     """Route to check if the robot is running and if it's IP address is known."""
+
     connected = connectionCheck()
     return Response('{connected}'.format(connected=connected), status=200, mimetype=contentType)
 
@@ -114,27 +120,25 @@ def connect():
 @app.get('/protocols')
 def getProtocols():
     """Route to get list of protocols known to the robot."""
+
     url = urlStart + IP_ADDRESS + robotPORT + "/protocols"
     headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
-    robotRequest = requests.request("GET", url, headers=headers)
-    protocols = json.loads(robotRequest.text)
-    if(robotRequest.status_code == 200):
+
+    #robotProtocolRequest
+    robotProtocolRequest = requests.request("GET", url, headers=headers)
+    protocols = json.loads(robotProtocolRequest.text)
+
+    if(robotProtocolRequest.status_code == 200): #if successful set the protocolList
         setProtocolList(protocols)
-        url = urlStart + IP_ADDRESS + robotPORT + "/runs"
-        headers = {"opentrons-version": "2", "Content-Type": contentType}
-        robotRequest = requests.request("GET", url, headers=headers)
-        runs = json.loads(robotRequest.text)
-        if(robotRequest.status_code == 200):
-            setRunsList(runs)
-            return Response(json.dumps(protocols), status=200, mimetype=contentType)
-        return Response(json.dumps({'error': 'No runs found'}), status=robotRequest.status_code, mimetype=contentType)
+        return Response(json.dumps(protocols), status=200, mimetype=contentType)
     else:
-        return Response(json.dumps({'error': 'No protocols found'}), status=robotRequest.status_code, mimetype=contentType)
+        return Response(json.dumps({'error': 'No protocols found'}), status=robotProtocolRequest.status_code, mimetype=contentType)
 
 @app.post('/runs')
 def post_run():
     """Route to create a run for the robot."""
-    getProtocols()
+
+    getProtocols() #Update the list of protocols and runs before creating a run
     try:
         tempProtocolList = getProtocolList()
         obj = request.get_data()
@@ -178,6 +182,7 @@ def post_run():
 @app.get('/runStatus')
 def runStatus():
     """Route to get the status of the current run."""
+
     if(getCurrentRun() == ""):
         return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + getCurrentRun()
@@ -196,6 +201,7 @@ def runStatus():
 @app.post('/command')
 def runAction():
     """Route to run/resume, pause or stop a run."""
+
     try:
         obj = request.get_data()
         obj = json.loads(obj)
