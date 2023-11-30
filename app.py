@@ -125,7 +125,10 @@ def getProtocols():
     headers = {"opentrons-version": "2", "Content-Type": contentType} #content type is json is a standard
 
     #robotProtocolRequest
-    robotProtocolRequest = requests.request("GET", url, headers=headers)
+    try:
+        robotProtocolRequest = requests.request("GET", url, headers=headers)
+    except requests.exceptions.InvalidURL:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
     protocols = json.loads(robotProtocolRequest.text)
 
     if(robotProtocolRequest.status_code == 200): #if successful set the protocolList
@@ -171,7 +174,11 @@ def post_run():
     payload["data"]["protocolId"] = tempProtocolId
     payload = json.dumps(payload)
 
-    robotRequest = requests.request("POST", url, headers=headers, data=payload)
+    try:
+        robotRequest = requests.request("POST", url, headers=headers, data=payload)
+    except requests.exceptions.InvalidURL:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
+    
     if(robotRequest.status_code == 201):
         returnString = robotRequest.json()["data"]["id"]
         setCurrentRun(returnString)
@@ -187,7 +194,12 @@ def runStatus():
         return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + getCurrentRun()
     headers = {"opentrons-version": "2", "Content-Type": contentType}
-    robotRequest = requests.request("GET", url, headers=headers)
+    
+    try:
+        robotRequest = requests.request("GET", url, headers=headers)
+    except requests.exceptions.InvalidURL:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
+
     if(robotRequest.status_code == 200):
         try:
             status = robotRequest.json()["data"]["status"]
@@ -231,7 +243,12 @@ def runAction():
     payload = json.dumps(payload)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + getCurrentRun() + "/actions"
     headers = {"opentrons-version": "2", "Content-Type": contentType}
-    robotRequest = requests.request("POST", url, headers=headers, data=payload)
+    
+    try:
+        robotRequest = requests.request("POST", url, headers=headers, data=payload)
+    except requests.exceptions.InvalidURL:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
+    
     if(robotRequest.status_code == 201):
         return Response(json.dumps({'message': 'To resume a paused protocol, use the following url: http://localhost:5000/execute/'}), status=201, mimetype=contentType)
     else:
