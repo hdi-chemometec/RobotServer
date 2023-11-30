@@ -14,10 +14,11 @@
 <!-- /TOC -->
 
 # Introduction
-This application is a server used for communicating with an Opentrons robot through HTTP API. The Opentrons HTTP APIs can be found atthe robots ip address and add:
+This application is a server used for communicating with an Opentrons robot through HTTP API. The Opentrons HTTP API documentation can be found at the robot's ip address and add:
 portnumber: `31950`
-path: `/redoc#tag/Control`
+path: `/redoc`
 
+An example: `http://169.254.189.20:31950/redoc`
 # Getting started
 
 Make sure you have the following installed:
@@ -29,10 +30,8 @@ Make sure you have the following installed:
 
 # Build and run
 
-There's a number of scripts that can be used to build and test the applications. These scripts can be found in the package.json file in the root folder of the project. The most important scripts are listed below:
-
-**Run dev server**
-This will start the servers in dev mode. This is the recommended way to start the application during development:
+**Run server**
+This will start the server:
 `python app.py`
 
 The server can be accessed at : `http://127.0.0.1:5000` 
