@@ -94,9 +94,9 @@ def connectionCheck():
                 return True #IP address found
         else:
             return False #no IP address found
-    except ConnectionError as e:
+    except ConnectionError:
         return False #error in connection, no IP address found
-    except e:
+    except:
         return False #error, no IP address found
     
 ### ROUTES ###
@@ -148,7 +148,7 @@ def post_run():
         obj = json.loads(obj)
         tempProtocolId = obj['protocol_id']
     except KeyError:
-        return Response(json.dumps({'error': 'No protocol with that id found'}), status=404, mimetype=contentType)
+        return Response(json.dumps({'error': 'No id found'}), status=404, mimetype=contentType)
     if(tempProtocolId not in tempProtocolList):
         return Response(json.dumps({'error': 'Protocol not found'}), status=404, mimetype=contentType)
     url = urlStart + IP_ADDRESS + robotPORT + "/runs"
@@ -198,14 +198,16 @@ def runStatus():
     try:
         robotRequest = requests.request("GET", url, headers=headers)
     except requests.exceptions.InvalidURL:
-        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
+        return Response(json.dumps({'error': 'No IP to robot found'}), status=400, mimetype=contentType)
+    except requests.exceptions.ConnectionError:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=400, mimetype=contentType)
 
     if(robotRequest.status_code == 200):
         try:
             status = robotRequest.json()["data"]["status"]
+            return Response(status, status=200, mimetype=contentType)
         except KeyError:
             return Response(json.dumps({'error': 'No current run'}), status=404, mimetype=contentType)
-        return Response(status, status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robotRequest)}), status=robotRequest.status_code, mimetype=contentType)
 
@@ -220,6 +222,8 @@ def runAction():
         command = obj['command']
     except KeyError:
         return Response(json.dumps({'error': 'No command found'}), status=404, mimetype=contentType)
+    except requests.exceptions.ConnectionError:
+        return Response(json.dumps({'error': 'No connection to robot'}), status=404, mimetype=contentType)
     if(runStatus() == "succeeded" or runStatus() == "stopped"):
         return Response(json.dumps({'error': 'Run has already been executed'}), status=403, mimetype=contentType)
     if(command == "play"):
