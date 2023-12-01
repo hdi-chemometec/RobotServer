@@ -8,9 +8,15 @@ import re #regular expression
 app = Flask(__name__)
 CORS(app)
 
-"""This is a REST API to communicate with the Opentrons robot.
+"""
+This is a REST API to communicate with the Opentrons robot.
 
-The API is used to get a list of protocols known to the robot, create a run for the robot, get the status of the current run and run/resume, pause or stop a run."""
+The API is used for:
+- to get a list of protocols known to the robot, 
+- create a run for the robot, 
+- get the status of the current run and run/resume, 
+- pause or stop a run.
+"""
 
 urlStart = 'http://'
 robotPORT = ":31950"
@@ -77,7 +83,8 @@ def setCurrentRun(tempValue):
 
 
 def connectionCheck():
-    """Function to check if the connection to the robot is working by fetching the IP address from the Node server.
+    """
+    Function to check if the connection to the robot is working by fetching the IP address from the Node server.
     
     It is used by the connect route."""
 
