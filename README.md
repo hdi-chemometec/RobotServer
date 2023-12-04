@@ -14,7 +14,7 @@
 <!-- /TOC -->
 
 # Introduction
-This application is a server used for communicating with an Opentrons robot through HTTP API. The Opentrons HTTP API documentation can be found at the robot's ip address and add:
+This application is a server used for communicating with an Opentrons robot through a REST API. The Opentrons REST API documentation can be found at the robot's ip address and add:
 portnumber: `31950`
 path: `/redoc`
 
@@ -38,7 +38,11 @@ The server can be accessed at : `http://127.0.0.1:5000`
 
 # Design
 
-The code tries as best as possible to follow REST principles.
+The code tries as best as possible to follow REST principles. 
+The REST endpoints and main function are located in `app.py`.
+The functions used by the endpoints are located in `src/functions.py` folder.
+By putting the functions into it's own folder, then the other endpoints can make
+use of them and only return a response that is relevant to that endpoint.
 
 # Code
 
