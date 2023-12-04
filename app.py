@@ -1,9 +1,6 @@
-from flask import Flask, Response, request
+from flask import Flask, Response
 from flask_cors import CORS
-from requests import ConnectionError
-import requests
 import json
-import re #regular expression
 
 from src.functions import connectionCheck, getProtocols, getRuns, postRun, getCurrentRun, getRunStatus, postRunAction
 
@@ -21,12 +18,9 @@ The API is used for:
 - pause or stop a run.
 """
 
-urlStart = 'http://'
-robotPORT = ":31950"
 contentType = 'application/json'
-nodeUrl = 'http://localhost:4000/connect' #Node Server url to check IP address
 
-    
+
 ### ROUTES ###
 
 @app.route('/')
@@ -43,17 +37,21 @@ def connect():
     connected = connectionCheck()
     return Response(json.dumps(connected), status=200, mimetype=contentType)
 
-# url to use to get list of protocols known to the robot
 @app.get('/protocols')
 def getProtocolsResponse():
     protocols = getProtocols()
-    return Response(json.dumps(protocols), status=200, mimetype=contentType)
-
+    if isinstance(protocols, dict):
+        return Response(json.dumps(protocols), status=200, mimetype=contentType)
+    else:
+        return protocols
 
 @app.get('/runs')
 def getRunsResponse():
     runs = getRuns()
-    return Response(json.dumps(runs), status=200, mimetype=contentType)
+    if isinstance(runs, dict):
+        return Response(json.dumps(runs), status=200, mimetype=contentType)
+    else:
+        return runs
 
 @app.post('/runs')
 def postRunResponse():
@@ -63,14 +61,19 @@ def postRunResponse():
 @app.get('/currentRun')
 def getCurrentRunResponse():
     currentRun = getCurrentRun()
-    return Response(json.dumps(currentRun), status=200, mimetype=contentType)
+    if isinstance(currentRun, str):
+        return Response(json.dumps(currentRun), status=200, mimetype=contentType)
+    else:
+        currentRun
 
 @app.get('/runStatus')
 def getRunStatusResponse():
     status = getRunStatus()
-    return Response(json.dumps(status), status=200, mimetype=contentType)
+    if isinstance(status, dict):
+        return Response(json.dumps(status), status=200, mimetype=contentType)
+    else:
+        return status
 
-#this command is used to run/resume, pause or stop a run
 @app.post('/command')
 def postRunActionResponse():
     response = postRunAction()
