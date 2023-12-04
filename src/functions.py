@@ -1,5 +1,4 @@
-from flask import Flask, Response, request
-from flask_cors import CORS
+from flask import Response, request
 from requests import ConnectionError
 import requests
 import json
@@ -33,6 +32,8 @@ def connectionCheck():
         return "False"
 
 def getProtocols():
+    """Route to get list of protocols known to the robot."""
+
     IP_ADDRESS = connectionCheck()
     if(IP_ADDRESS == "False"):
         return Response(json.dumps({'error': 'No connection to robot'}), status=200, mimetype=contentType)
@@ -54,7 +55,7 @@ def getProtocols():
         return {}
     
 def getRuns():
-    """Route to get list of protocols known to the robot."""
+    """Route to get list of runs known to the robot."""
 
     IP_ADDRESS = connectionCheck()
     if(IP_ADDRESS == "False"):
