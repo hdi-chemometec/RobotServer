@@ -151,7 +151,7 @@ def getRunStatus():
 
     currentRunRequest = getCurrentRun()
     if(len(currentRunRequest) == 0):
-        return Response(json.dumps({'error': 'No current run'}), status=200, mimetype=contentType)
+        return Response('', status=200, mimetype=contentType)
     currentRun = currentRunRequest 
     url = urlStart + IP_ADDRESS + robotPORT + "/runs/" + currentRun
     headers = {"opentrons-version": "2", "Content-Type": contentType}
@@ -168,7 +168,7 @@ def getRunStatus():
             status = robotRequest.json()["data"]["status"]
             return status
         except KeyError:
-            return Response(json.dumps({'error': 'No current run'}), status=200, mimetype=contentType)
+            return Response('', status=200, mimetype=contentType)
     else:
         return Response(json.dumps({'error': '{error}'.format(error=robotRequest)}), status=200, mimetype=contentType)
 
