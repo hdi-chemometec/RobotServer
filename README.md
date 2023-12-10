@@ -32,13 +32,16 @@ Make sure you have the following installed:
 # Build and run
 
 **Install packages**
+
 Before running the project the following packages must be installed with pip:
 - `pip install flask`
 - `pip install flask_cors`
 - `pip install requests`
 
 **Run server**
+
 This will start the server:
+
 `python app.py`
 
 The server can be accessed at : `http://127.0.0.1:5000` 
@@ -58,5 +61,6 @@ use of them and only return a response that is relevant to that endpoint.
 The primary tech stack is as follows:
 
 - Python - language
+- pip - package manager
 - Flask - server
 - Requests - HTTP library for python
