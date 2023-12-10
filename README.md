@@ -25,7 +25,6 @@ Make sure you have the following installed:
 - python 3.7.9
 - pip 20.1.1
 - Visual Studio Code
-- Chrome
 - Powershell (You can use the one embedded in VS Code)
 
 ## Clone repo
