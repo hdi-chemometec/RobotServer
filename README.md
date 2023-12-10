@@ -24,12 +24,18 @@ An example: `http://169.254.189.20:31950/redoc`
 Make sure you have the following installed:
 
 - python 3.7.9
-- pip
+- pip 20.1.1
 - Visual Studio Code
 - Chrome
 - Powershell (You can use the one embedded in VS Code)
 
 # Build and run
+
+**Install packages**
+Before running the project the following packages must be installed with pip:
+- `pip install flask`
+- `pip install flask_cors`
+- `pip install requests`
 
 **Run server**
 This will start the server:
