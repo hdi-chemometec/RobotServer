@@ -28,6 +28,10 @@ Make sure you have the following installed:
 - Chrome
 - Powershell (You can use the one embedded in VS Code)
 
+## Clone repo
+Start by cloning the repo. This can be done with the following command in the terminal:
+`git clone https://github.com/hdi-chemometec/RobotServer.git`
+
 # Build and run
 
 **Install packages**
