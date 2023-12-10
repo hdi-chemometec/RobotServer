@@ -25,6 +25,7 @@ Make sure you have the following installed:
 
 - python 3.7.9
 - pip
+- Visual Studio Code
 - Chrome
 - Powershell (You can use the one embedded in VS Code)
 
