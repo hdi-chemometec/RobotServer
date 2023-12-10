@@ -11,7 +11,6 @@
   - [Tech stack](#tech-stack)
 
 <!-- /TOC -->
-<!-- /TOC -->
 
 # Introduction
 This application is a server used for communicating with an Opentrons robot through a REST API. The Opentrons REST API documentation can be found at the robot's ip address and add:
